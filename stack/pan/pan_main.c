@@ -632,11 +632,9 @@ void pan_data_buf_ind_cb (UINT16 handle,
             if (pan_cb.pan_data_buf_ind_cb)
                 (*pan_cb.pan_data_buf_ind_cb) (pcb->handle, src, dst, protocol, p_buf, ext, forward);
             else if (pan_cb.pan_data_ind_cb)
-            {
                 (*pan_cb.pan_data_ind_cb) (pcb->handle, src, dst, protocol, p_data, len, ext, forward);
-                osi_free(p_buf);
-            }
 
+            osi_free(p_buf);
             return;
         }
 
@@ -659,13 +657,9 @@ void pan_data_buf_ind_cb (UINT16 handle,
     if (pan_cb.pan_data_buf_ind_cb)
         (*pan_cb.pan_data_buf_ind_cb) (pcb->handle, src, dst, protocol, p_buf, ext, forward);
     else if (pan_cb.pan_data_ind_cb)
-    {
         (*pan_cb.pan_data_ind_cb) (pcb->handle, src, dst, protocol, p_data, len, ext, forward);
-        osi_free(p_buf);
-    }
-    else
-        osi_free(p_buf);
 
+    osi_free(p_buf);
     return;
 }
 
