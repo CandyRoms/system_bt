@@ -190,6 +190,8 @@ BOOLEAN sdp_dev_blacklisted_for_avrcp15 (BD_ADDR addr)
     return FALSE;
 }
 
+#if ((defined(SDP_AVRCP_1_6) && (SDP_AVRCP_1_6 == TRUE)) || \
+        (defined(SDP_AVRCP_1_5) && (SDP_AVRCP_1_5 == TRUE)))
 /*************************************************************************************
 **
 ** Function        sdp_fallback_avrcp_version
@@ -251,6 +253,7 @@ BOOLEAN sdp_fallback_avrcp_version (tSDP_ATTRIBUTE *p_attr, BD_ADDR remote_addre
     }
     return FALSE;
 }
+#endif
 
 /*************************************************************************************
 **
@@ -488,7 +491,7 @@ static void process_service_search (tCONN_CB *p_ccb, UINT16 trans_num,
         }
         BE_STREAM_TO_UINT16 (cont_offset, p_req);
 
-        if (cont_offset != p_ccb->cont_offset)
+        if (cont_offset != p_ccb->cont_offset || num_rsp_handles < cont_offset)
         {
             sdpu_build_n_send_error (p_ccb, trans_num, SDP_INVALID_CONT_STATE,
                                      SDP_TEXT_BAD_CONT_INX);

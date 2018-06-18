@@ -1496,7 +1496,7 @@
 #endif
 
 #ifndef SDP_AVRCP_1_6
-#define SDP_AVRCP_1_6               TRUE
+#define SDP_AVRCP_1_6               FALSE
 #endif
 
 #ifndef  SDP_AVRCP_1_5
@@ -1686,5 +1686,16 @@ The maximum number of payload octets that the local device can receive in a sing
 #endif
 
 #include "bt_trace.h"
+
+/******************************************************************************
+**
+** Wear
+**
+******************************************************************************/
+
+/* Enable/disable LE IO capability overriding to no-input-no-output on first bond */
+#ifndef WEAR_LE_IO_CAP_OVERRIDE
+#define WEAR_LE_IO_CAP_OVERRIDE FALSE
+#endif
 
 #endif /* BT_TARGET_H */

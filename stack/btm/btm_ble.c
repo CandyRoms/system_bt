@@ -33,7 +33,6 @@
 
 #include "bt_types.h"
 #include "bt_utils.h"
-#include "btif/include/btif_storage.h"
 #include "btm_ble_api.h"
 #include "btm_int.h"
 #include "btu.h"
@@ -71,7 +70,7 @@ extern void gatt_notify_enc_cmpl(BD_ADDR bd_addr);
 ** Returns          TRUE if added OK, else FALSE
 **
 *******************************************************************************/
-BOOLEAN BTM_SecAddBleDevice (BD_ADDR bd_addr, BD_NAME bd_name, tBT_DEVICE_TYPE dev_type,
+BOOLEAN BTM_SecAddBleDevice (const BD_ADDR bd_addr, BD_NAME bd_name, tBT_DEVICE_TYPE dev_type,
                              tBLE_ADDR_TYPE addr_type)
 {
     BTM_TRACE_DEBUG ("%s: dev_type=0x%x", __func__, dev_type);
@@ -117,37 +116,6 @@ BOOLEAN BTM_SecAddBleDevice (BD_ADDR bd_addr, BD_NAME bd_name, tBT_DEVICE_TYPE d
     }
 
     return TRUE;
-}
-
-/*******************************************************************************
-**
-** Function         BTM_GetRemoteDeviceName
-**
-** Description      This function is called to get the dev name of remote device
-**                  from NV
-**
-** Returns          TRUE if success; otherwise failed.
-**
-*******************************************************************************/
-BOOLEAN BTM_GetRemoteDeviceName(BD_ADDR bda, BD_NAME bd_name)
-{
-    BTM_TRACE_DEBUG("%s", __func__);
-    BOOLEAN ret = FALSE;
-    bt_bdname_t bdname;
-    bt_property_t prop_name;
-    bt_bdaddr_t bd_addr;
-    bdcpy(bd_addr.address, bda);
-
-    BTIF_STORAGE_FILL_PROPERTY(&prop_name, BT_PROPERTY_BDNAME,
-                          sizeof(bt_bdname_t), &bdname);
-    if (btif_storage_get_remote_device_property(
-        &bd_addr, &prop_name) == BT_STATUS_SUCCESS)
-    {
-        APPL_TRACE_DEBUG("%s, NV name = %s", __func__, bdname.name);
-        strlcpy((char*) bd_name, (char*) bdname.name, BD_NAME_LEN);
-        ret = TRUE;
-    }
-    return ret;
 }
 
 /*******************************************************************************
@@ -485,16 +453,56 @@ void BTM_BleOobDataReply(BD_ADDR bd_addr, UINT8 res, UINT8 len, UINT8 *p_data)
     tSMP_STATUS res_smp = (res == BTM_SUCCESS) ? SMP_SUCCESS : SMP_OOB_FAIL;
     tBTM_SEC_DEV_REC  *p_dev_rec = btm_find_dev (bd_addr);
 
-    BTM_TRACE_DEBUG ("BTM_BleOobDataReply");
+    BTM_TRACE_DEBUG ("%s:", __func__);
 
-    if (p_dev_rec == NULL)
-    {
-        BTM_TRACE_ERROR("BTM_BleOobDataReply() to Unknown device");
+    if (p_dev_rec == NULL) {
+        BTM_TRACE_ERROR("%s: Unknown device", __func__);
         return;
     }
 
     p_dev_rec->sec_flags |= BTM_SEC_LE_AUTHENTICATED;
     SMP_OobDataReply(bd_addr, res_smp, len, p_data);
+#endif
+}
+
+/*******************************************************************************
+**
+** Function         BTM_BleSecureConnectionOobDataReply
+**
+** Description      This function is called to provide the OOB data for
+**                  SMP in response to BTM_LE_OOB_REQ_EVT when secure connection
+**                  data is available
+**
+** Parameters:      bd_addr     - Address of the peer device
+**                  p_c         - pointer to Confirmation.
+**                  p_r         - pointer to Randomizer
+**
+*******************************************************************************/
+void BTM_BleSecureConnectionOobDataReply(BD_ADDR bd_addr,
+                                         uint8_t *p_c, uint8_t *p_r)
+{
+#if SMP_INCLUDED == TRUE
+    tBTM_SEC_DEV_REC  *p_dev_rec = btm_find_dev (bd_addr);
+
+    BTM_TRACE_DEBUG ("%s:", __func__);
+
+    if (p_dev_rec == NULL) {
+        BTM_TRACE_ERROR("%s: Unknown device", __func__);
+        return;
+    }
+
+    p_dev_rec->sec_flags |= BTM_SEC_LE_AUTHENTICATED;
+
+    tSMP_SC_OOB_DATA oob;
+    memset(&oob, 0, sizeof(tSMP_SC_OOB_DATA));
+
+    oob.peer_oob_data.present = true;
+    memcpy(&oob.peer_oob_data.randomizer, p_r, BT_OCTET16_LEN);
+    memcpy(&oob.peer_oob_data.commitment, p_c, BT_OCTET16_LEN);
+    oob.peer_oob_data.addr_rcvd_from.type = p_dev_rec->ble.ble_addr_type;
+    memcpy(&oob.peer_oob_data.addr_rcvd_from.bda, bd_addr, sizeof(BD_ADDR));
+
+    SMP_SecureConnectionOobDataReply((uint8_t*)&oob);
 #endif
 }
 
@@ -2772,7 +2780,6 @@ void btm_ble_set_keep_rfu_in_auth_req(BOOLEAN keep_rfu)
     BTM_TRACE_DEBUG ("btm_ble_set_keep_rfu_in_auth_req keep_rfus=%d", keep_rfu);
     btm_cb.devcb.keep_rfu_in_auth_req = keep_rfu;
 }
-
 
 #endif /* BTM_BLE_CONFORMANCE_TESTING */
 

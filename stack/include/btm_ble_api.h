@@ -912,7 +912,7 @@ extern "C" {
 ** Returns          TRUE if added OK, else FALSE
 **
 *******************************************************************************/
-extern BOOLEAN BTM_SecAddBleDevice (BD_ADDR bd_addr, BD_NAME bd_name,
+extern BOOLEAN BTM_SecAddBleDevice (const BD_ADDR bd_addr, BD_NAME bd_name,
                                            tBT_DEVICE_TYPE dev_type, tBLE_ADDR_TYPE addr_type);
 
 /*******************************************************************************
@@ -1235,6 +1235,22 @@ extern void BTM_BleConfirmReply (BD_ADDR bd_addr, UINT8 res);
 **
 *******************************************************************************/
 extern void BTM_BleOobDataReply(BD_ADDR bd_addr, UINT8 res, UINT8 len, UINT8 *p_data);
+
+/*******************************************************************************
+**
+** Function         BTM_BleSecureConnectionOobDataReply
+**
+** Description      This function is called to provide the OOB data for
+**                  SMP in response to BTM_LE_OOB_REQ_EVT when secure connection
+**                  data is available
+**
+** Parameters:      bd_addr     - Address of the peer device
+**                  p_c         - pointer to Confirmation
+**                  p_r         - pointer to Randomizer.
+**
+*******************************************************************************/
+extern void BTM_BleSecureConnectionOobDataReply(BD_ADDR bd_addr,
+                                                uint8_t *p_c, uint8_t *p_r);
 
 
 /*******************************************************************************
@@ -1860,20 +1876,6 @@ extern tBTM_STATUS BTM_BleGetEnergyInfo(tBTM_BLE_ENERGY_INFO_CBACK *p_ener_cback
 **
 *******************************************************************************/
 extern tBTM_STATUS BTM_SetBleDataLength(BD_ADDR bd_addr, UINT16 tx_pdu_length);
-
-
-
-/*******************************************************************************
-**
-** Function         BTM_GetRemoteDeviceName
-**
-** Description      This function is called to get the dev name of remote device
-**                  from NV
-**
-** Returns          TRUE if success; otherwise failed.
-**
-*******************************************************************************/
-extern BOOLEAN BTM_GetRemoteDeviceName(BD_ADDR bda, BD_NAME bdname);
 
 #ifdef __cplusplus
 }
