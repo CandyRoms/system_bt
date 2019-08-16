@@ -16,6 +16,9 @@ cc_library_static {
         "connection_handler.cc",
         "device.cc",
     ],
+    cflags: [
+        "-Wno-macro-redefined",
+    ],
     static_libs: [
         "lib-bt-packets",
         "libbluetooth-types",

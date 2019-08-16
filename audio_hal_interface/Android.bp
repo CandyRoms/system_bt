@@ -27,6 +27,7 @@ cc_library_static {
     ],
     cflags: [
         "-DBUILDCFG",
+        "-Wno-macro-redefined",
     ],
 }
 

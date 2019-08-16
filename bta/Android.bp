@@ -34,7 +34,10 @@ cc_defaults {
 cc_library_static {
     name: "libbt-bta",
     defaults: ["fluoride_bta_defaults"],
-    cflags: ["-Wno-implicit-fallthrough"],
+    cflags: [
+        "-Wno-implicit-fallthrough",
+        "-Wno-macro-redefined"
+    ],
     srcs: [
         "ag/bta_ag_act.cc",
         "ag/bta_ag_api.cc",

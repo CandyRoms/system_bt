@@ -29,6 +29,9 @@ cc_library_static {
     local_include_dirs: [
         "include",
     ],
+    cflags: [
+        "-Wno-macro-redefined",
+    ],
     include_dirs: [
         "system/bt",
         "system/bt/internal_include",

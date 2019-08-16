@@ -658,7 +658,7 @@ static void dispatch_reassembled(BT_HDR* packet) {
 // Misc internal functions
 
 static waiting_command_t* get_waiting_command(command_opcode_t opcode) {
-  std::unique_guard<std::recursive_timed_mutex> lock(
+  std::unique_lock<std::recursive_timed_mutex> lock(
       commands_pending_response_mutex);
 
   for (const list_node_t* node = list_begin(commands_pending_response);
