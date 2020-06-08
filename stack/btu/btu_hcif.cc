@@ -48,6 +48,7 @@
 #include "btu.h"
 #include "common/metrics.h"
 #include "device/include/controller.h"
+#include "hci_evt_length.h"
 #include "hci_layer.h"
 #include "hcimsgs.h"
 #include "l2c_int.h"
@@ -64,18 +65,20 @@ extern void smp_cancel_start_encryption_attempt();
 /*            L O C A L    F U N C T I O N     P R O T O T Y P E S            */
 /******************************************************************************/
 static void btu_hcif_inquiry_comp_evt(uint8_t* p);
-static void btu_hcif_inquiry_result_evt(uint8_t* p);
-static void btu_hcif_inquiry_rssi_result_evt(uint8_t* p);
-static void btu_hcif_extended_inquiry_result_evt(uint8_t* p);
+static void btu_hcif_inquiry_result_evt(uint8_t* p, uint8_t hci_evt_len);
+static void btu_hcif_inquiry_rssi_result_evt(uint8_t* p, uint8_t hci_evt_len);
+static void btu_hcif_extended_inquiry_result_evt(uint8_t* p,
+                                                 uint8_t hci_evt_len);
 
-static void btu_hcif_connection_comp_evt(uint8_t* p);
+static void btu_hcif_connection_comp_evt(uint8_t* p, uint8_t evt_len);
 static void btu_hcif_connection_request_evt(uint8_t* p);
 static void btu_hcif_disconnection_comp_evt(uint8_t* p);
 static void btu_hcif_authentication_comp_evt(uint8_t* p);
 static void btu_hcif_rmt_name_request_comp_evt(uint8_t* p, uint16_t evt_len);
 static void btu_hcif_encryption_change_evt(uint8_t* p);
 static void btu_hcif_read_rmt_features_comp_evt(uint8_t* p);
-static void btu_hcif_read_rmt_ext_features_comp_evt(uint8_t* p);
+static void btu_hcif_read_rmt_ext_features_comp_evt(uint8_t* p,
+                                                    uint8_t evt_len);
 static void btu_hcif_read_rmt_version_comp_evt(uint8_t* p);
 static void btu_hcif_qos_setup_comp_evt(uint8_t* p);
 static void btu_hcif_command_complete_evt(BT_HDR* response, void* context);
@@ -84,7 +87,7 @@ static void btu_hcif_command_status_evt(uint8_t status, BT_HDR* command,
 static void btu_hcif_hardware_error_evt(uint8_t* p);
 static void btu_hcif_flush_occured_evt(void);
 static void btu_hcif_role_change_evt(uint8_t* p);
-static void btu_hcif_num_compl_data_pkts_evt(uint8_t* p);
+static void btu_hcif_num_compl_data_pkts_evt(uint8_t* p, uint8_t evt_len);
 static void btu_hcif_mode_change_evt(uint8_t* p);
 static void btu_hcif_pin_code_request_evt(uint8_t* p);
 static void btu_hcif_link_key_request_evt(uint8_t* p);
@@ -255,6 +258,13 @@ void btu_hcif_process_event(UNUSED_ATTR uint8_t controller_id, BT_HDR* p_msg) {
   STREAM_TO_UINT8(hci_evt_code, p);
   STREAM_TO_UINT8(hci_evt_len, p);
 
+  // validate event size
+  if (hci_evt_len < hci_event_parameters_minimum_length[hci_evt_code]) {
+    HCI_TRACE_WARNING("%s: evt:0x%2X, malformed event of size %hhd", __func__,
+                      hci_evt_code, hci_evt_len);
+    return;
+  }
+
   btu_hcif_log_event_metrics(hci_evt_code, p);
 
   switch (hci_evt_code) {
@@ -262,16 +272,16 @@ void btu_hcif_process_event(UNUSED_ATTR uint8_t controller_id, BT_HDR* p_msg) {
       btu_hcif_inquiry_comp_evt(p);
       break;
     case HCI_INQUIRY_RESULT_EVT:
-      btu_hcif_inquiry_result_evt(p);
+      btu_hcif_inquiry_result_evt(p, hci_evt_len);
       break;
     case HCI_INQUIRY_RSSI_RESULT_EVT:
-      btu_hcif_inquiry_rssi_result_evt(p);
+      btu_hcif_inquiry_rssi_result_evt(p, hci_evt_len);
       break;
     case HCI_EXTENDED_INQUIRY_RESULT_EVT:
-      btu_hcif_extended_inquiry_result_evt(p);
+      btu_hcif_extended_inquiry_result_evt(p, hci_evt_len);
       break;
     case HCI_CONNECTION_COMP_EVT:
-      btu_hcif_connection_comp_evt(p);
+      btu_hcif_connection_comp_evt(p, hci_evt_len);
       break;
     case HCI_CONNECTION_REQUEST_EVT:
       btu_hcif_connection_request_evt(p);
@@ -295,7 +305,7 @@ void btu_hcif_process_event(UNUSED_ATTR uint8_t controller_id, BT_HDR* p_msg) {
       btu_hcif_read_rmt_features_comp_evt(p);
       break;
     case HCI_READ_RMT_EXT_FEATURES_COMP_EVT:
-      btu_hcif_read_rmt_ext_features_comp_evt(p);
+      btu_hcif_read_rmt_ext_features_comp_evt(p, hci_evt_len);
       break;
     case HCI_READ_RMT_VERSION_COMP_EVT:
       btu_hcif_read_rmt_version_comp_evt(p);
@@ -325,7 +335,7 @@ void btu_hcif_process_event(UNUSED_ATTR uint8_t controller_id, BT_HDR* p_msg) {
       btu_hcif_role_change_evt(p);
       break;
     case HCI_NUM_COMPL_DATA_PKTS_EVT:
-      btu_hcif_num_compl_data_pkts_evt(p);
+      btu_hcif_num_compl_data_pkts_evt(p, hci_evt_len);
       break;
     case HCI_MODE_CHANGE_EVT:
       btu_hcif_mode_change_evt(p);
@@ -947,9 +957,9 @@ static void btu_hcif_inquiry_comp_evt(uint8_t* p) {
  * Returns          void
  *
  ******************************************************************************/
-static void btu_hcif_inquiry_result_evt(uint8_t* p) {
+static void btu_hcif_inquiry_result_evt(uint8_t* p, uint8_t hci_evt_len) {
   /* Store results in the cache */
-  btm_process_inq_results(p, BTM_INQ_RESULT_STANDARD);
+  btm_process_inq_results(p, hci_evt_len, BTM_INQ_RESULT_STANDARD);
 }
 
 /*******************************************************************************
@@ -961,9 +971,9 @@ static void btu_hcif_inquiry_result_evt(uint8_t* p) {
  * Returns          void
  *
  ******************************************************************************/
-static void btu_hcif_inquiry_rssi_result_evt(uint8_t* p) {
+static void btu_hcif_inquiry_rssi_result_evt(uint8_t* p, uint8_t hci_evt_len) {
   /* Store results in the cache */
-  btm_process_inq_results(p, BTM_INQ_RESULT_WITH_RSSI);
+  btm_process_inq_results(p, hci_evt_len, BTM_INQ_RESULT_WITH_RSSI);
 }
 
 /*******************************************************************************
@@ -975,9 +985,10 @@ static void btu_hcif_inquiry_rssi_result_evt(uint8_t* p) {
  * Returns          void
  *
  ******************************************************************************/
-static void btu_hcif_extended_inquiry_result_evt(uint8_t* p) {
+static void btu_hcif_extended_inquiry_result_evt(uint8_t* p,
+                                                 uint8_t hci_evt_len) {
   /* Store results in the cache */
-  btm_process_inq_results(p, BTM_INQ_RESULT_EXTENDED);
+  btm_process_inq_results(p, hci_evt_len, BTM_INQ_RESULT_EXTENDED);
 }
 
 /*******************************************************************************
@@ -989,13 +1000,19 @@ static void btu_hcif_extended_inquiry_result_evt(uint8_t* p) {
  * Returns          void
  *
  ******************************************************************************/
-static void btu_hcif_connection_comp_evt(uint8_t* p) {
+static void btu_hcif_connection_comp_evt(uint8_t* p, uint8_t evt_len) {
   uint8_t status;
   uint16_t handle;
   RawAddress bda;
   uint8_t link_type;
   uint8_t enc_mode;
   tBTM_ESCO_DATA esco_data;
+
+  if (evt_len < 11) {
+    android_errorWriteLog(0x534e4554, "141619686");
+    HCI_TRACE_WARNING("%s: malformed event of size %hhd", __func__, evt_len);
+    return;
+  }
 
   STREAM_TO_UINT8(status, p);
   STREAM_TO_UINT16(handle, p);
@@ -1211,7 +1228,8 @@ static void btu_hcif_read_rmt_features_comp_evt(uint8_t* p) {
  * Returns          void
  *
  ******************************************************************************/
-static void btu_hcif_read_rmt_ext_features_comp_evt(uint8_t* p) {
+static void btu_hcif_read_rmt_ext_features_comp_evt(uint8_t* p,
+                                                    uint8_t evt_len) {
   uint8_t* p_cur = p;
   uint8_t status;
   uint16_t handle;
@@ -1219,7 +1237,7 @@ static void btu_hcif_read_rmt_ext_features_comp_evt(uint8_t* p) {
   STREAM_TO_UINT8(status, p_cur);
 
   if (status == HCI_SUCCESS)
-    btm_read_remote_ext_features_complete(p);
+    btm_read_remote_ext_features_complete(p, evt_len);
   else {
     STREAM_TO_UINT16(handle, p_cur);
     btm_read_remote_ext_features_failed(status, handle);
@@ -1697,9 +1715,9 @@ static void btu_hcif_role_change_evt(uint8_t* p) {
  * Returns          void
  *
  ******************************************************************************/
-static void btu_hcif_num_compl_data_pkts_evt(uint8_t* p) {
+static void btu_hcif_num_compl_data_pkts_evt(uint8_t* p, uint8_t evt_len) {
   /* Process for L2CAP and SCO */
-  l2c_link_process_num_completed_pkts(p);
+  l2c_link_process_num_completed_pkts(p, evt_len);
 
   /* Send on to SCO */
   /*?? No SCO for now */
